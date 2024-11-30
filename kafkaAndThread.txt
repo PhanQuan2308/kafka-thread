@@ -1,0 +1,29 @@
+* Dùng Kafka để gửi email khi đặt đơn hàng thành công: 
+
+1. Khi người dùng nhấn nút đặt hàng, sẽ tạo một đơn hàng với trạng thái ban đầu là PENDING, sau đó người dùng được chuyển hướng đến cổng thanh toán ở đây là paypal.
+
+2. Cùng lúc này sẽ tạo ra transactionId được lưu vào order và sau đó sẽ tạo payment với trạng thái là PENDING và có 1 transactionId giống với order
+
+3. Nếu như thanh toán thành công thì sẽ chuyển trạng thái Order thành fail nếu như thành công thì sẽ chuyển trạng thái của payment và order thành success
+
+4. Tiếp theo là trừ kho và tiến hành dùng KAFKA  để gửi email:  + Sau khi hoàn thành mỗi giai đoạn, hệ thống đẩy một message vào Kafka topic email-notification
+
+                                                                + Sau đó Consumer lắng nghe Kafka topic email-notification
+
+                                                                + Mục Đích: - Xử lí bất đồng bộ, Gửi email không ảnh hưởng đến luồng chính của hệ thống. 
+                                                                              Người dùng không phải chờ email được gửi để hoàn tất đơn hàng.
+
+
+
+
+* Dùng Executors để tạo ra đa luồng:
+
+1. Tạo một ExecutorService với 5 luồng cố định
+
+2. Mỗi lần có yêu cầu tạo order từ phía người dùng, một tác vụ được gửi đến ExecutorService. Mỗi tác vụ sẽ thực hiện việc lưu thông tin đơn hàng vào cơ sở dữ liệu.
+
+3. Nếu có lỗi xảy ra khi lưu đơn hàng bắt ngoại lệ trong thread và thực hiện rollback hoặc lưu log để xử lý sau.
+
+4. Thay vì xử lý tuần tự từng yêu cầu, việc sử dụng 5 luồng cố định giúp xử lý nhiều yêu cầu song song, giảm thời gian chờ đợi của người dùng.
+
+5. Giới hạn số luồng ở mức 5 giúp hệ thống tránh tình trạng quá tải.
