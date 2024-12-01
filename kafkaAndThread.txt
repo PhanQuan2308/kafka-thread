@@ -4,7 +4,7 @@
 
 2. Cùng lúc này sẽ tạo ra transactionId được lưu vào order và sau đó sẽ tạo payment với trạng thái là PENDING và có 1 transactionId giống với order
 
-3. Nếu như thanh toán thành công thì sẽ chuyển trạng thái Order thành fail nếu như thành công thì sẽ chuyển trạng thái của payment và order thành success
+3. Nếu như thanh toán khong thành công thì sẽ chuyển trạng thái Order thành fail nếu như thành công thì sẽ chuyển trạng thái của payment và order thành success
 
 4. Tiếp theo là trừ kho và tiến hành dùng KAFKA  để gửi email:  + Sau khi hoàn thành mỗi giai đoạn, hệ thống đẩy một message vào Kafka topic email-notification
 
