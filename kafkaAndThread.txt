@@ -5,25 +5,34 @@
 2. Cùng lúc này sẽ tạo ra transactionId được lưu vào order và sau đó sẽ tạo payment với trạng thái là PENDING và có 1 transactionId giống với order
 
 3. Nếu như thanh toán khong thành công thì sẽ chuyển trạng thái Order thành fail nếu như thành công thì sẽ chuyển trạng thái của payment và order thành success
+->Câu hỏi : Nếu như payment thành công -> update trạng thái đơn hàng là thành công, vậy nếu như trong kho hết hàng thì sao?
 
-4. Tiếp theo là trừ kho và tiến hành dùng KAFKA  để gửi email:  + Sau khi hoàn thành mỗi giai đoạn, hệ thống đẩy một message vào Kafka topic email-notification
+4. Tiếp theo là trừ kho và tiến hành dùng KAFKA  để gửi email: 
++ Sau khi hoàn thành mỗi giai đoạn, hệ thống đẩy một message vào Kafka topic email-notification
+->Câu hỏi : giai đoạn ở đây là gia đoạn nào? có phải là giai đoạn 1,2,3 ở trên không? Nếu đúng thì gửi email cho từng giai đoạn nội dung sẽ là gì? có thực sự cần thiết không?
 
-                                                                + Sau đó Consumer lắng nghe Kafka topic email-notification
++ Sau đó Consumer lắng nghe Kafka topic email-notification
 
-                                                                + Mục Đích: - Xử lí bất đồng bộ, Gửi email không ảnh hưởng đến luồng chính của hệ thống. 
-                                                                              Người dùng không phải chờ email được gửi để hoàn tất đơn hàng.
+ + Mục Đích: - Xử lí bất đồng bộ, Gửi email không ảnh hưởng đến luồng chính của hệ thống. 
+ Người dùng không phải chờ email được gửi để hoàn tất đơn hàng
 
 
 
 
 * Dùng Executors để tạo ra đa luồng:
 
-1. Tạo một ExecutorService với 5 luồng cố định
+1. Tạo một ExecutorService với 5 luồng cố định -> Câu hỏi : tai sao là 5 luồng mà không phải 10, 20 luồng?
 
-2. Mỗi lần có yêu cầu tạo order từ phía người dùng, một tác vụ được gửi đến ExecutorService. Mỗi tác vụ sẽ thực hiện việc lưu thông tin đơn hàng vào cơ sở dữ liệu.
+2. Mỗi lần có yêu cầu tạo order từ phía người dùng, một tác vụ được gửi đến ExecutorService ? 
+-> Câu hỏi: Gửi tới executeService ? Em có biêt execute service sinh ra để làm gì không?
+Mỗi tác vụ sẽ thực hiện việc lưu thông tin đơn hàng vào cơ sở dữ liệu
+-> Câu hỏi: Lưu xong thì hệ thống làm gì tiếp theo? Khác gì so với luồng em đã mô tả phía trên khi sử dụng multi thread?
 
 3. Nếu có lỗi xảy ra khi lưu đơn hàng bắt ngoại lệ trong thread và thực hiện rollback hoặc lưu log để xử lý sau.
+-> Lưu log ở đâu ? Thực hiện lại bằng cách nào ?
 
 4. Thay vì xử lý tuần tự từng yêu cầu, việc sử dụng 5 luồng cố định giúp xử lý nhiều yêu cầu song song, giảm thời gian chờ đợi của người dùng.
+-> Câu hỏi: Làm sao người dùng có thể thanh toán khi em sử dụng thread?
 
-5. Giới hạn số luồng ở mức 5 giúp hệ thống tránh tình trạng quá tải.
+5. Giới hạn số luồng ở mức 5 giúp hệ thống tránh tình trạng quá tải
+-> Câu hỏi: Thông tin quá tải nếu quá 5 luồng này đọc ở đâu đây em?
