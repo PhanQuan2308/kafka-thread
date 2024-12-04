@@ -1,38 +1,45 @@
 * Dùng Kafka để gửi email khi đặt đơn hàng thành công: 
 
-1. Khi người dùng nhấn nút đặt hàng, sẽ tạo một đơn hàng với trạng thái ban đầu là PENDING, sau đó người dùng được chuyển hướng đến cổng thanh toán ở đây là paypal.
+1. Khi người dùng nhấn nút đặt hàng -> kiểm tra số lượng tồn kho ngay lập tức:
+        + tạo 1 bảng ReservedStock để giữ chỗ để quản lý giữ chỗ 15 phút. Bảng này giúp lưu trạng thái tạm thời trước khi thanh toán hoàn tất.
+        + Cơ chế ReservedStock:
+            - Khi thanh toán thành công, xóa giữ chỗ và trừ hàng chính thức.
+            - Khi thanh toán thất bại hoặc timeout, hoàn lại hàng vào kho và xóa giữ chỗ.
 
+        -> tạo đơn hàng với trạng thái ban đầu là PENDING -> chuyển hướng đến cổng thanh toán ở đây là paypal.
+    
 2. Cùng lúc này sẽ tạo ra transactionId được lưu vào order và sau đó sẽ tạo payment với trạng thái là PENDING và có 1 transactionId giống với order
 
-3. Nếu như thanh toán khong thành công thì sẽ chuyển trạng thái Order thành fail nếu như thành công thì sẽ chuyển trạng thái của payment và order thành success
-->Câu hỏi : Nếu như payment thành công -> update trạng thái đơn hàng là thành công, vậy nếu như trong kho hết hàng thì sao?
+3. Nếu như thanh toán không thành công thì sẽ chuyển trạng thái Order thành FAILED nếu như thành công thì sẽ chuyển trạng thái của payment và order thành SUCCESS -> tiến hành trừ kho
+         
+4. Tiếp theo tiến hành dùng KAFKA  để gửi email: 
 
-4. Tiếp theo là trừ kho và tiến hành dùng KAFKA  để gửi email: 
-+ Sau khi hoàn thành mỗi giai đoạn, hệ thống đẩy một message vào Kafka topic email-notification
-->Câu hỏi : giai đoạn ở đây là gia đoạn nào? có phải là giai đoạn 1,2,3 ở trên không? Nếu đúng thì gửi email cho từng giai đoạn nội dung sẽ là gì? có thực sự cần thiết không?
++ Sau khi hoàn thành tất cả các  giai đoạn, gửi email kết quả cuối cùng:
+    
+    Thành công → Đơn hàng được xử lý.
+    
+    Thất bại → Thông báo lý do và hướng xử lý. 
+    
+    Hệ thống đẩy một message vào Kafka topic email-notification: 
 
-+ Sau đó Consumer lắng nghe Kafka topic email-notification
+        + Sau đó Consumer lắng nghe Kafka topic email-notification
 
- + Mục Đích: - Xử lí bất đồng bộ, Gửi email không ảnh hưởng đến luồng chính của hệ thống. 
- Người dùng không phải chờ email được gửi để hoàn tất đơn hàng
-
-
+        + Mục Đích: - Xử lí bất đồng bộ, Gửi email không ảnh hưởng đến luồng chính của hệ thống. 
+                    - Người dùng không phải chờ email được gửi để hoàn tất đơn hàng
 
 
-* Dùng Executors để tạo ra đa luồng:
 
-1. Tạo một ExecutorService với 5 luồng cố định -> Câu hỏi : tai sao là 5 luồng mà không phải 10, 20 luồng?
+============================================================================================================================================
 
-2. Mỗi lần có yêu cầu tạo order từ phía người dùng, một tác vụ được gửi đến ExecutorService ? 
--> Câu hỏi: Gửi tới executeService ? Em có biêt execute service sinh ra để làm gì không?
-Mỗi tác vụ sẽ thực hiện việc lưu thông tin đơn hàng vào cơ sở dữ liệu
--> Câu hỏi: Lưu xong thì hệ thống làm gì tiếp theo? Khác gì so với luồng em đã mô tả phía trên khi sử dụng multi thread?
+* Dùng ExecutorService để tạo ra đa luồng:
 
-3. Nếu có lỗi xảy ra khi lưu đơn hàng bắt ngoại lệ trong thread và thực hiện rollback hoặc lưu log để xử lý sau.
--> Lưu log ở đâu ? Thực hiện lại bằng cách nào ?
+1. Tạo một ExecutorService với 5 luồng cố định:
+    + 10, 20 luồng có thể gây quá tải CPU, tăng chi phí.
+    + Dự án trung có khối lượng công việc trung bình nên chọn 5-8 luồng là phù hợp.
+
+2. Mỗi yêu cầu từ phía người dùng sẽ được đưa vào hàng đợi (queue) của ExecutorService ->  Một luồng có sẵn sẽ lấy và xử lý yêu cầu.   
+   
+3. Nếu có lỗi xảy ra khi lưu đơn hàng bắt ngoại lệ trong thread và thực hiện rollback.
 
 4. Thay vì xử lý tuần tự từng yêu cầu, việc sử dụng 5 luồng cố định giúp xử lý nhiều yêu cầu song song, giảm thời gian chờ đợi của người dùng.
--> Câu hỏi: Làm sao người dùng có thể thanh toán khi em sử dụng thread?
-
-5. Giới hạn số luồng ở mức 5 giúp hệ thống tránh tình trạng quá tải
--> Câu hỏi: Thông tin quá tải nếu quá 5 luồng này đọc ở đâu đây em?
+   + Để xác định đơn hàng của người dùng được gửi đến đúng người dùng đó thì sử dụng userId để liên kết đơn hàng với người đó.
